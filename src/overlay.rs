@@ -38,6 +38,7 @@ struct OverlayState {
     start: POINT,
     cur: POINT,
     result: Option<Rect>,
+    finished: bool,
 }
 
 /// Show the overlay over `background` (a snapshot of the whole virtual desktop,
@@ -61,6 +62,7 @@ pub fn select_region(background: &CapturedImage, bounds: Rect) -> Result<Option<
             start: POINT::default(),
             cur: POINT::default(),
             result: None,
+            finished: false,
         });
         let ptr = Box::into_raw(state);
 
@@ -90,9 +92,22 @@ pub fn select_region(background: &CapturedImage, bounds: Rect) -> Result<Option<
         let _ = SetForegroundWindow(hwnd);
 
         let mut msg = MSG::default();
-        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+        loop {
+            let ret = GetMessageW(&mut msg, None, 0, 0).0;
+            if ret == -1 {
+                break;
+            }
+            if ret == 0 {
+                // External WM_QUIT: tear down our window, then re-post it for the outer loop.
+                let _ = DestroyWindow(hwnd);
+                PostQuitMessage(0);
+                break;
+            }
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
+            if (*ptr).finished {
+                break;
+            }
         }
 
         // Reclaim the box (WM_NCDESTROY only freed GDI handles) and read the result.
@@ -216,8 +231,8 @@ unsafe extern "system" fn wndproc(
                     let _ = DeleteObject(s.bmp.into());
                     s.bmp = HBITMAP::default();
                 }
+                s.finished = true;
             }
-            PostQuitMessage(0);
             LRESULT(0)
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -231,7 +246,6 @@ unsafe fn build_background(s: &mut OverlayState) {
     let screen = GetDC(None);
     let mem = CreateCompatibleDC(Some(screen));
     let bmp = CreateCompatibleBitmap(screen, w, h);
-    SelectObject(mem, bmp.into());
 
     let bmi = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
@@ -245,15 +259,19 @@ unsafe fn build_background(s: &mut OverlayState) {
         },
         ..Default::default()
     };
-    SetDIBits(
-        Some(screen),
-        bmp,
-        0,
-        h as u32,
-        s.image.bgra.as_ptr() as *const _,
-        &bmi,
-        DIB_RGB_COLORS,
-    );
+    // SetDIBits requires the bitmap NOT be selected into a DC; fill it before selecting.
+    if s.image.bgra.len() == (s.image.width as usize) * (s.image.height as usize) * 4 {
+        SetDIBits(
+            Some(screen),
+            bmp,
+            0,
+            h as u32,
+            s.image.bgra.as_ptr() as *const _,
+            &bmi,
+            DIB_RGB_COLORS,
+        );
+    }
+    SelectObject(mem, bmp.into());
     ReleaseDC(None, screen);
 
     s.mem_dc = mem;

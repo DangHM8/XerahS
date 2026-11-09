@@ -34,20 +34,32 @@ impl HotkeyManager {
         }
         self.id_to_preset.clear();
 
+        // Attempt every preset; one bad hotkey must not disable the others.
+        let mut errors: Vec<String> = Vec::new();
         for preset in presets {
             let spec = preset.hotkey.trim();
             if spec.is_empty() {
                 continue;
             }
-            let hotkey = HotKey::from_str(spec)
-                .map_err(|e| Error::Hotkey(format!("'{spec}': {e}")))?;
-            self.manager
-                .register(hotkey)
-                .map_err(|e| Error::Hotkey(format!("'{spec}': {e}")))?;
+            let hotkey = match HotKey::from_str(spec) {
+                Ok(h) => h,
+                Err(e) => {
+                    errors.push(format!("'{spec}': {e}"));
+                    continue;
+                }
+            };
+            if let Err(e) = self.manager.register(hotkey) {
+                errors.push(format!("'{spec}': {e}"));
+                continue;
+            }
             self.id_to_preset.insert(hotkey.id(), preset.id.clone());
             self.registered.push(hotkey);
         }
-        Ok(())
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::Hotkey(errors.join("; ")))
+        }
     }
 
     /// Non-blocking: return the `id` of the preset whose hotkey just fired.

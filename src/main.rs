@@ -39,7 +39,13 @@ fn main() {
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
 
-    let mut settings = settings::load().unwrap_or_default();
+    let mut settings = match settings::load() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("settings load error: {e}; starting with defaults (existing file left intact)");
+            Settings::default()
+        }
+    };
     let counter = AtomicU32::new(1);
 
     let tray = match tray::Tray::new() {
@@ -61,12 +67,17 @@ fn main() {
         eprintln!("failed to register hotkeys: {e}");
     }
 
+    let mut workers: Vec<std::thread::JoinHandle<()>> = Vec::new();
+
     loop {
         pump_messages();
+        workers.retain(|h| !h.is_finished());
 
         if let Some(id) = hotkeys.poll() {
             if let Some(preset) = settings.presets.iter().find(|p| p.id == id) {
-                capture_preset(preset, &settings, &counter);
+                if let Some(handle) = capture_preset(preset, &settings, &counter) {
+                    workers.push(handle);
+                }
             }
         }
 
@@ -89,16 +100,25 @@ fn main() {
 
         thread::sleep(Duration::from_millis(10));
     }
+
+    // Drain pending save workers so an in-flight capture is not lost on quit.
+    for handle in workers {
+        let _ = handle.join();
+    }
 }
 
 /// Capture one preset, then encode + save + toast on a worker thread so the
 /// hotkey loop stays responsive.
-fn capture_preset(preset: &Preset, settings: &Settings, counter: &AtomicU32) {
+fn capture_preset(
+    preset: &Preset,
+    settings: &Settings,
+    counter: &AtomicU32,
+) -> Option<std::thread::JoinHandle<()>> {
     let image = match capture::capture_rect(preset.region) {
         Ok(img) => img,
         Err(e) => {
             eprintln!("capture failed: {e}");
-            return;
+            return None;
         }
     };
 
@@ -124,10 +144,12 @@ fn capture_preset(preset: &Preset, settings: &Settings, counter: &AtomicU32) {
     let filename = naming::render_filename(&template, &ctx);
     let toast_cfg = settings.toast.clone();
 
-    thread::spawn(move || match save::save_to(&image, &dir, &filename, format, quality) {
-        Ok(path) => toast::show_toast(&image, &path, &toast_cfg),
-        Err(e) => eprintln!("save failed: {e}"),
-    });
+    let handle =
+        thread::spawn(move || match save::save_to(&image, &dir, &filename, format, quality) {
+            Ok(path) => toast::show_toast(&image, &path, &toast_cfg),
+            Err(e) => eprintln!("save failed: {e}"),
+        });
+    Some(handle)
 }
 
 /// Drain the thread message queue so tray-icon and global-hotkey deliver events.

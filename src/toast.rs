@@ -12,7 +12,9 @@ use std::thread;
 use std::time::Instant;
 
 use windows::core::{w, PCWSTR};
-use windows::Win32::Foundation::{COLORREF, HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
+use windows::Win32::Foundation::{
+    COLORREF, GlobalFree, HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM,
+};
 use windows::Win32::Graphics::Gdi::{
     BeginPaint, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, FillRect, SetBkMode,
     SetStretchBltMode, SetTextColor, StretchDIBits, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
@@ -100,10 +102,17 @@ unsafe fn run(state: ToastState) {
 
     let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 0, LWA_ALPHA);
     let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-    SetTimer(Some(hwnd), TIMER_ID, 15, None);
+    if SetTimer(Some(hwnd), TIMER_ID, 15, None) == 0 {
+        // Without a timer nothing would fade it in or close it; tear down now.
+        let _ = DestroyWindow(hwnd);
+    }
 
     let mut msg = MSG::default();
-    while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+    loop {
+        let ret = GetMessageW(&mut msg, None, 0, 0).0;
+        if ret == -1 || ret == 0 {
+            break;
+        }
         let _ = TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
@@ -169,15 +178,17 @@ unsafe extern "system" fn wndproc(
             let st = state_ptr(hwnd);
             if !st.is_null() {
                 let s = &*st;
-                let elapsed = s.start.elapsed().as_millis() as u32;
-                let fade = s.config.fade_ms.max(1);
-                let total = fade + s.config.duration_ms + fade;
+                // u64 math: toast timing comes from config and must not overflow.
+                let elapsed = s.start.elapsed().as_millis() as u64;
+                let fade = s.config.fade_ms.max(1) as u64;
+                let duration = s.config.duration_ms as u64;
+                let total = fade + duration + fade;
                 if elapsed >= total {
                     let _ = DestroyWindow(hwnd);
                 } else {
                     let alpha = if elapsed < fade {
                         (elapsed * 255 / fade) as u8
-                    } else if elapsed < fade + s.config.duration_ms {
+                    } else if elapsed < fade + duration {
                         255
                     } else {
                         ((total - elapsed) * 255 / fade) as u8
@@ -220,12 +231,12 @@ unsafe fn click(hwnd: HWND, pick: impl Fn(&ToastConfig) -> ToastAction) {
     let st = state_ptr(hwnd);
     if !st.is_null() {
         let s = &*st;
-        perform(pick(&s.config), &s.path);
+        perform(hwnd, pick(&s.config), &s.path);
     }
     let _ = DestroyWindow(hwnd);
 }
 
-unsafe fn perform(action: ToastAction, path: &Path) {
+unsafe fn perform(hwnd: HWND, action: ToastAction, path: &Path) {
     match action {
         ToastAction::None => {}
         ToastAction::OpenFile => shell_open(path),
@@ -234,7 +245,7 @@ unsafe fn perform(action: ToastAction, path: &Path) {
                 shell_open(dir);
             }
         }
-        ToastAction::CopyPath => copy_to_clipboard(&path.to_string_lossy()),
+        ToastAction::CopyPath => copy_to_clipboard(hwnd, &path.to_string_lossy()),
     }
 }
 
@@ -250,19 +261,25 @@ unsafe fn shell_open(p: &Path) {
     );
 }
 
-unsafe fn copy_to_clipboard(text: &str) {
+unsafe fn copy_to_clipboard(hwnd: HWND, text: &str) {
     let wide = to_wide(text);
     let bytes = wide.len() * 2;
-    if OpenClipboard(None).is_err() {
+    // Associate the clipboard with our window so SetClipboardData has a valid owner.
+    if OpenClipboard(Some(hwnd)).is_err() {
         return;
     }
     let _ = EmptyClipboard();
     if let Ok(hglobal) = GlobalAlloc(GMEM_MOVEABLE, bytes) {
+        let mut published = false;
         let dst = GlobalLock(hglobal) as *mut u16;
         if !dst.is_null() {
             std::ptr::copy_nonoverlapping(wide.as_ptr(), dst, wide.len());
             let _ = GlobalUnlock(hglobal);
-            let _ = SetClipboardData(CF_UNICODETEXT.0 as u32, Some(HANDLE(hglobal.0)));
+            published = SetClipboardData(CF_UNICODETEXT.0 as u32, Some(HANDLE(hglobal.0))).is_ok();
+        }
+        // The system owns the block only once ownership transfers; otherwise free it.
+        if !published {
+            let _ = GlobalFree(Some(hglobal));
         }
     }
     let _ = CloseClipboard();
@@ -327,6 +344,10 @@ unsafe fn draw_thumbnail(hdc: HDC, img: &CapturedImage, area: &RECT) {
     let iw = img.width as i32;
     let ih = img.height as i32;
     if iw <= 0 || ih <= 0 {
+        return;
+    }
+    // Guard the FFI read: the buffer must hold exactly width*height*4 bytes.
+    if img.bgra.len() != (img.width as usize) * (img.height as usize) * 4 {
         return;
     }
 

@@ -79,14 +79,15 @@ pub fn capture_rect(region: Rect) -> Result<CapturedImage> {
                 SRCCOPY | CAPTUREBLT,
             );
 
+            // GetDIBits requires the bitmap NOT be selected into a DC, so deselect first.
+            SelectObject(mem_dc, old);
+
             let out = if blt.is_ok() {
                 read_pixels(mem_dc, bitmap, w, h)
             } else {
                 Err(Error::Capture("BitBlt failed".into()))
             };
 
-            // Cleanup GDI objects for this scope.
-            SelectObject(mem_dc, old);
             let _ = DeleteObject(bitmap.into());
             let _ = DeleteDC(mem_dc);
             out
@@ -127,8 +128,10 @@ unsafe fn read_pixels(
         &mut bmi,
         DIB_RGB_COLORS,
     );
-    if scanlines == 0 {
-        return Err(Error::Capture("GetDIBits returned 0 scanlines".into()));
+    if scanlines != h {
+        return Err(Error::Capture(format!(
+            "GetDIBits returned {scanlines} of {h} scanlines"
+        )));
     }
 
     // GDI leaves the 4th byte undefined for BI_RGB 32bpp; force opaque alpha.
