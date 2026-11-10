@@ -23,7 +23,7 @@ pub fn run_settings(initial: Settings) -> Result<Settings> {
         settings: initial,
         output: output.clone(),
         pending_region: None,
-        hide_countdown: 0,
+        hide_started: None,
         page: Page::Presets,
         selected: 0,
     };
@@ -61,7 +61,7 @@ struct SettingsApp {
     settings: Settings,
     output: Arc<Mutex<Settings>>,
     pending_region: Option<usize>,
-    hide_countdown: u8,
+    hide_started: Option<std::time::Instant>,
     page: Page,
     selected: usize,
 }
@@ -75,20 +75,22 @@ struct Actions {
 
 impl eframe::App for SettingsApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Deferred region capture: hide the window for a couple frames first so it
-        // does not appear in the snapshot, then run the overlay. `logic` keeps
-        // running while the window is hidden, so the capture happens out of view.
+        // Deferred region capture: hide the window and wait until the Windows
+        // hide animation has fully finished, so neither the snapshot nor the
+        // element picker sees it. `logic` keeps running while hidden.
         if self.pending_region.is_some() {
-            if self.hide_countdown > 0 {
-                self.hide_countdown -= 1;
+            let started = *self.hide_started.get_or_insert_with(std::time::Instant::now);
+            if started.elapsed() < std::time::Duration::from_millis(350) {
                 ctx.request_repaint();
                 return;
             }
+            self.hide_started = None;
             let idx = self.pending_region.take().unwrap();
+            let initial = self.settings.presets.get(idx).map(|p| p.region);
             if let (Ok(bg), Ok(bounds)) =
                 (capture::capture_fullscreen(), capture::virtual_screen_bounds())
             {
-                if let Ok(Some(rect)) = overlay::select_region(&bg, bounds) {
+                if let Ok(Some(rect)) = overlay::select_region(&bg, bounds, initial) {
                     if let Some(p) = self.settings.presets.get_mut(idx) {
                         p.region = rect;
                     }
@@ -125,7 +127,7 @@ impl eframe::App for SettingsApp {
         }
         if let Some(i) = act.set_region {
             self.pending_region = Some(i);
-            self.hide_countdown = 2;
+            self.hide_started = None;
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Visible(false));
             ui.ctx().request_repaint();
         }
@@ -250,16 +252,46 @@ fn preset_form(ui: &mut egui::Ui, i: usize, p: &mut Preset, act: &mut Actions) {
 
     section(ui, "Region");
     egui::Grid::new(("p_region", i)).num_columns(2).spacing(ROW_GAP).show(ui, |ui| {
-        ui.label("Area");
-        ui.monospace(format!(
-            "x {}  y {}   {} × {}",
-            p.region.x, p.region.y, p.region.width, p.region.height
-        ));
+        ui.label("Position");
+        ui.horizontal(|ui| {
+            ui.label("X");
+            ui.add(egui::DragValue::new(&mut p.region.x).speed(1));
+            ui.add_space(8.0);
+            ui.label("Y");
+            ui.add(egui::DragValue::new(&mut p.region.y).speed(1));
+        });
+        ui.end_row();
+
+        ui.label("Size");
+        ui.horizontal(|ui| {
+            ui.label("W");
+            ui.add(egui::DragValue::new(&mut p.region.width).speed(1).range(1..=16384));
+            ui.add_space(8.0);
+            ui.label("H");
+            ui.add(egui::DragValue::new(&mut p.region.height).speed(1).range(1..=16384));
+        });
+        ui.end_row();
+
+        ui.label("Presets");
+        ui.horizontal(|ui| {
+            for (label, w, h) in [("1280×720", 1280, 720), ("1920×1080", 1920, 1080), ("800×600", 800, 600), ("Square", 0, 0)] {
+                if ui.small_button(label).clicked() {
+                    if w == 0 {
+                        let s = p.region.width.min(p.region.height);
+                        p.region.width = s;
+                        p.region.height = s;
+                    } else {
+                        p.region.width = w;
+                        p.region.height = h;
+                    }
+                }
+            }
+        });
         ui.end_row();
 
         ui.label("");
         if ui
-            .add(egui::Button::new("Select region on screen…").min_size(egui::vec2(0.0, 30.0)))
+            .add(egui::Button::new("⛶  Select region on screen…").min_size(egui::vec2(0.0, 30.0)))
             .clicked()
         {
             act.set_region = Some(i);
