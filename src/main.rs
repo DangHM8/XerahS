@@ -1,4 +1,4 @@
-//! REA_ShareX — fast pre-configured region screenshot utility.
+//! XerahS — fast pre-configured region screenshot utility.
 //!
 //! Background tray app. Each preset binds a global hotkey to a fixed screen
 //! region; pressing it captures that region, saves it with the configured name,
@@ -202,7 +202,7 @@ fn pump_messages() {
 
 /// Headless end-to-end check of the hotkey pipeline: register a combo, simulate
 /// the keypress with SendInput, and confirm `poll()` reports it. Run with
-/// `rea_sharex.exe --selftest-hotkey` (debug build, so stdout is visible).
+/// `xerahs.exe --selftest-hotkey` (debug build, so stdout is visible).
 fn selftest_hotkey() {
     use std::time::Instant;
     use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -392,10 +392,10 @@ fn foreground_window_title() -> Option<String> {
     }
 }
 
-/// Diagnostic log at `%TEMP%\rea_sharex.log`. Best-effort; never fails the app.
+/// Diagnostic log at `%TEMP%\xerahs.log`. Best-effort; never fails the app.
 fn log_line(msg: &str) {
     use std::io::Write;
-    let path = std::env::temp_dir().join("rea_sharex.log");
+    let path = std::env::temp_dir().join("xerahs.log");
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
         let _ = writeln!(f, "{ts}  {msg}");

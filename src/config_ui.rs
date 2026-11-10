@@ -32,12 +32,12 @@ pub fn run_settings(initial: Settings) -> Result<Settings> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([820.0, 600.0])
             .with_min_inner_size([680.0, 460.0])
-            .with_title("REA_ShareX Settings"),
+            .with_title("XerahS Settings"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "REA_ShareX Settings",
+        "XerahS Settings",
         native_options,
         Box::new(move |_cc| Ok(Box::new(app) as Box<dyn eframe::App>)),
     )
@@ -139,7 +139,7 @@ impl eframe::App for SettingsApp {
 impl SettingsApp {
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         ui.add_space(14.0);
-        ui.label(egui::RichText::new("REA_ShareX").size(18.0).strong());
+        ui.label(egui::RichText::new("XerahS").size(18.0).strong());
         ui.weak("Settings");
         ui.add_space(18.0);
         for (page, label) in [

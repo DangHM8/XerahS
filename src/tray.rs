@@ -32,7 +32,7 @@ impl Tray {
         let quit_id = quit_item.id().clone();
 
         let tray = TrayIconBuilder::new()
-            .with_tooltip("REA_ShareX")
+            .with_tooltip("XerahS")
             .with_menu(Box::new(menu))
             .with_icon(default_icon())
             .build()
@@ -59,27 +59,11 @@ impl Tray {
     }
 }
 
-/// A simple 32x32 RGBA icon: a blue tile with a lighter "lens" square.
+/// XerahS logo (assets/tray32.png), decoded at startup.
 fn default_icon() -> Icon {
-    const N: usize = 32;
-    let mut rgba = vec![0u8; N * N * 4];
-    for y in 0..N {
-        for x in 0..N {
-            let i = (y * N + x) * 4;
-            let border = x < 2 || x >= N - 2 || y < 2 || y >= N - 2;
-            let lens = (8..24).contains(&x) && (8..24).contains(&y);
-            let (r, g, b) = if border {
-                (20, 40, 70)
-            } else if lens {
-                (220, 230, 245)
-            } else {
-                (40, 110, 210)
-            };
-            rgba[i] = r;
-            rgba[i + 1] = g;
-            rgba[i + 2] = b;
-            rgba[i + 3] = 255;
-        }
-    }
-    Icon::from_rgba(rgba, N as u32, N as u32).expect("valid icon dimensions")
+    let img = image::load_from_memory(include_bytes!("../assets/tray32.png"))
+        .expect("embedded tray icon")
+        .into_rgba8();
+    let (w, h) = img.dimensions();
+    Icon::from_rgba(img.into_raw(), w, h).expect("valid icon dimensions")
 }

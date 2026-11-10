@@ -40,7 +40,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use crate::model::{CapturedImage, ToastAction, ToastConfig, ToastCorner};
 
-const CLASS_NAME: PCWSTR = w!("REA_ShareX_Toast");
+const CLASS_NAME: PCWSTR = w!("XerahS_Toast");
 const TIMER_ID: usize = 1;
 
 struct ToastState {
@@ -81,7 +81,7 @@ unsafe fn run(state: ToastState) {
     let hwnd = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
         CLASS_NAME,
-        w!("REA_ShareX"),
+        w!("XerahS"),
         WS_POPUP,
         x,
         y,

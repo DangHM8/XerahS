@@ -8,13 +8,13 @@ use std::{
 
 use crate::model::{Error, Result, Settings};
 
-/// Returns the settings file path: `%APPDATA%\REA_ShareX\settings.json`.
+/// Returns the settings file path: `%APPDATA%\XerahS\settings.json`.
 pub fn settings_path() -> PathBuf {
     std::env::var_os("APPDATA")
         .map(PathBuf::from)
         .or_else(dirs::config_dir)
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("REA_ShareX")
+        .join("XerahS")
         .join("settings.json")
 }
 
@@ -65,7 +65,7 @@ mod tests {
             static NEXT: AtomicU64 = AtomicU64::new(0);
             loop {
                 let path = std::env::temp_dir().join(format!(
-                    "rea-sharex-settings-{}-{}",
+                    "xerahs-settings-{}-{}",
                     std::process::id(),
                     NEXT.fetch_add(1, Ordering::Relaxed)
                 ));

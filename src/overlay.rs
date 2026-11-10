@@ -27,7 +27,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows::Win32::Foundation::{HINSTANCE, COLORREF};
 
-const CLASS_NAME: PCWSTR = w!("REA_ShareX_Overlay");
+const CLASS_NAME: PCWSTR = w!("XerahS_Overlay");
 
 struct OverlayState {
     image: CapturedImage,
@@ -69,7 +69,7 @@ pub fn select_region(background: &CapturedImage, bounds: Rect) -> Result<Option<
         let hwnd = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
             CLASS_NAME,
-            w!("REA_ShareX Select Region"),
+            w!("XerahS Select Region"),
             WS_POPUP | WS_VISIBLE,
             bounds.x,
             bounds.y,
