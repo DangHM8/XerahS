@@ -190,7 +190,7 @@ impl Default for Settings {
         Self {
             presets: Vec::new(),
             default_output_dir: default_pictures_dir(),
-            default_filename_template: "REA_%Y-%m-%d_%H-%M-%S_%n".to_string(),
+            default_filename_template: "XerahS_%Y-%m-%d_%H-%M-%S_%n".to_string(),
             default_format: ImageFormat::Png,
             default_quality: 90,
             toast: ToastConfig::default(),
