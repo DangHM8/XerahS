@@ -74,3 +74,9 @@ impl HotkeyManager {
         None
     }
 }
+
+/// Whether a hotkey spec parses (e.g. `"Ctrl+Shift+KeyA"`, `"Alt+Digit1"`, `"\\"`).
+pub fn is_valid(spec: &str) -> bool {
+    let s = spec.trim();
+    !s.is_empty() && HotKey::from_str(s).is_ok()
+}

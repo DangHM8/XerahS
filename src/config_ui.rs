@@ -99,8 +99,15 @@ impl eframe::App for SettingsApp {
                             ui.horizontal(|ui| {
                                 ui.label("Hotkey:");
                                 ui.text_edit_singleline(&mut p.hotkey);
-                                ui.label("e.g. Ctrl+Shift+KeyA");
+                                if p.hotkey.trim().is_empty() {
+                                    ui.weak("(none)");
+                                } else if crate::hotkey::is_valid(&p.hotkey) {
+                                    ui.colored_label(egui::Color32::from_rgb(60, 180, 75), "✓ valid");
+                                } else {
+                                    ui.colored_label(egui::Color32::from_rgb(220, 70, 70), "✗ invalid");
+                                }
                             });
+                            ui.label("e.g. Ctrl+Shift+KeyA · Alt+Digit1 · or a single key like \\");
                             ui.horizontal(|ui| {
                                 ui.label(format!(
                                     "Region: {},{}  {}×{}",
