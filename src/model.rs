@@ -129,6 +129,8 @@ pub enum ToastAction {
     OpenFile,
     OpenFolder,
     CopyPath,
+    /// Permanently delete the saved file (no confirmation).
+    DeleteFile,
 }
 
 /// Fully customizable toast configuration (ShareX-style notification).
@@ -161,7 +163,7 @@ impl Default for ToastConfig {
             height: 300,
             margin: 16,
             duration_ms: 2000,
-            fade_ms: 300,
+            fade_ms: 120,
             show_thumbnail: true,
             left_click: ToastAction::OpenFile,
             right_click: ToastAction::OpenFolder,

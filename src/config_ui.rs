@@ -288,6 +288,7 @@ fn action_combo(ui: &mut egui::Ui, label: &str, value: &mut ToastAction) {
                 ToastAction::OpenFile,
                 ToastAction::OpenFolder,
                 ToastAction::CopyPath,
+                ToastAction::DeleteFile,
             ] {
                 ui.selectable_value(value, a, format!("{a:?}"));
             }

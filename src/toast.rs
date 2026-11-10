@@ -102,7 +102,7 @@ unsafe fn run(state: ToastState) {
 
     let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 0, LWA_ALPHA);
     let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-    if SetTimer(Some(hwnd), TIMER_ID, 15, None) == 0 {
+    if SetTimer(Some(hwnd), TIMER_ID, 10, None) == 0 {
         // Without a timer nothing would fade it in or close it; tear down now.
         let _ = DestroyWindow(hwnd);
     }
@@ -246,6 +246,9 @@ unsafe fn perform(hwnd: HWND, action: ToastAction, path: &Path) {
             }
         }
         ToastAction::CopyPath => copy_to_clipboard(hwnd, &path.to_string_lossy()),
+        ToastAction::DeleteFile => {
+            let _ = std::fs::remove_file(path);
+        }
     }
 }
 

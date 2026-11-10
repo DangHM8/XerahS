@@ -172,13 +172,15 @@ fn capture_preset(
     };
     let filename = naming::render_filename(&template, &ctx);
     let toast_cfg = settings.toast.clone();
+    let path = dir.join(&filename);
+
+    // Show the toast immediately from the in-memory image so it feels instant;
+    // encode + write to disk happens in parallel on the worker thread.
+    toast::show_toast(&image, &path, &toast_cfg);
 
     let handle =
         thread::spawn(move || match save::save_to(&image, &dir, &filename, format, quality) {
-            Ok(path) => {
-                log_line(&format!("saved: {}", path.display()));
-                toast::show_toast(&image, &path, &toast_cfg);
-            }
+            Ok(path) => log_line(&format!("saved: {}", path.display())),
             Err(e) => {
                 eprintln!("save failed: {e}");
                 log_line(&format!("save error: {e}"));
