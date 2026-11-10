@@ -85,7 +85,7 @@ src/
   hotkey.rs     global hotkey registration
   save.rs       PNG/JPG encoding & saving
   naming.rs     filename templates
-  toast.rs      post-capture notification
+  toast.rs      post-capture notification  
   tray.rs       system tray icon & menu
   config_ui.rs  settings window (egui)
   settings.rs   settings.json load/save
@@ -93,4 +93,3 @@ src/
 assets/         logo & icons
 ```
 
-> ⚠️ The **DeleteFile** toast action permanently deletes the file without confirmation.
